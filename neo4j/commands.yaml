@@ -1,0 +1,46 @@
+helmCommands:
+  # 💡 Template Command: Render templates without installing
+  template: |
+    helm template neo4j . --values neo4j-override-values.yaml
+
+  # 💡 Lint Command: Validate chart syntax
+  lint: |
+    helm lint . --values neo4j-override-values.yaml
+
+  # 💡 Dry-run Command: Simulate installation without deploying
+  dryRun: |
+    helm install neo4j . --values neo4j-override-values.yaml --namespace neo4j-ns --dry-run --debug
+
+  # 💡 Install Command: Install the chart into Kubernetes
+  install: |
+    helm install neo4j . --values neo4j-override-values.yaml --namespace neo4j-ns  --debug
+
+  # 💡 Upgrade Command: Upgrade an existing release with updated chart values
+  upgrade: |
+    helm upgrade neo4j . --values neo4j-override-values.yaml --namespace neo4j-ns
+
+  # 💡 Uninstall Command: Remove the release from Kubernetes
+  uninstall: |
+    helm uninstall neo4j --namespace neo4j-ns
+
+  # 💡 Status Command: Check the release status
+  status: |
+    helm status neo4j --namespace neo4j-ns
+
+  # 💡 List Command: List all installed Helm releases
+  list: |
+    helm list --namespace neo4j-ns
+
+  # 💡 History Command: View the revision history of a release
+  history: |
+    helm history neo4j --namespace neo4j-ns
+
+  # 💡 Rollback Command: Roll back to a previous release
+  rollback: |
+    helm rollback neo4j <REVISION> --namespace neo4j-ns
+
+  # 💡 vs-apply: vs-apply
+  vs-apply: |
+    kubectl apply -f neo4j-istio-virtualservice.yaml
+    kubectl delete virtualservice neo4j-virtualservice -n neo4j-ns
+    

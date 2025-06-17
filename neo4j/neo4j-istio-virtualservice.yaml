@@ -1,0 +1,76 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: neo4j-virtualservice
+  namespace: neo4j-ns
+spec:
+  hosts:
+    - "gcp.psai.dev"
+  gateways:
+    - "istio-system/ps-lbg-gateway"
+  http:
+    # Handle direct /browser/ requests and redirect to our path
+    - match:
+        - uri:
+            exact: "/browser"
+      redirect:
+        uri: "/web/neo4j-ui/"
+    
+    - match:
+        - uri:
+            exact: "/browser/"
+      redirect:
+        uri: "/web/neo4j-ui/"
+    
+    - match:
+        - uri:
+            prefix: "/browser/"
+      redirect:
+        uri: "/web/neo4j-ui/"
+    
+    # Handle root path redirect
+    - match:
+        - uri:
+            exact: "/web/neo4j-ui"
+      redirect:
+        uri: "/web/neo4j-ui/"
+    
+    # Main Neo4j Browser - handle everything under /web/neo4j-ui/
+    - match:
+        - uri:
+            prefix: "/web/neo4j-ui/"
+      rewrite:
+        uri: "/"
+      route:
+        - destination:
+            host: neo4j-community
+            port:
+              number: 7474
+      headers:
+        request:
+          set:
+            X-Forwarded-Proto: "https"
+            X-Forwarded-Host: "gcp.psai.dev"
+            X-Forwarded-For: "%DOWNSTREAM_REMOTE_ADDRESS%"
+            Host: "neo4j-community"
+        response:
+          set:
+            X-Frame-Options: "SAMEORIGIN"
+
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: neo4j-destination-rule
+  namespace: neo4j-ns
+spec:
+  host: neo4j-community
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 100
+        connectTimeout: 30s
+      http:
+        http1MaxPendingRequests: 50
+        maxRequestsPerConnection: 10
+        h2UpgradePolicy: UPGRADE

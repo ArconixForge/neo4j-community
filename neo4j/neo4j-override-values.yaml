@@ -1,0 +1,230 @@
+# Neo4j Community Edition Helm Override Values for GCP
+# This file contains the configuration for deploying Neo4j on GCP with Istio integration
+
+# Global settings
+nameOverride: ""
+fullnameOverride: "neo4j-community"
+# Disable lookups to avoid issues during linting/templating
+disableLookups: true
+
+neo4j:
+  name: "neo4j-community"
+  edition: "community"
+  # Set a strong password or leave empty for auto-generation
+  password: "Db@123456"
+  
+  # Resource configuration
+  resources:
+    cpu: "1000m"
+    memory: "2Gi"
+
+# Volume configuration using GCP standard-rwo storage class
+volumes:
+  data:
+    mode: "dynamic"
+    dynamic:
+      storageClassName: "standard-rwo"
+      accessModes:
+        - ReadWriteOnce
+      requests:
+        storage: 10Gi
+    labels: {}
+    disableSubPathExpr: false
+
+  # Share data volume for other purposes to optimize storage usage
+  logs:
+    mode: "share"
+    share:
+      name: "data"
+    disableSubPathExpr: false
+
+  metrics:
+    mode: "share"
+    share:
+      name: "data" 
+    disableSubPathExpr: false
+
+  import:
+    mode: "share"
+    share:
+      name: "data"
+    disableSubPathExpr: false
+
+  backups:
+    mode: "share"
+    share:
+      name: "data"
+    disableSubPathExpr: false
+
+# Service configuration for Istio integration
+services:
+  # Main Neo4j service - will be exposed through Istio
+  neo4j:
+    enabled: true
+    annotations: {}
+    spec:
+      type: ClusterIP  # Changed from LoadBalancer to ClusterIP for Istio
+    ports:
+      http:
+        enabled: true
+        port: 7474
+        targetPort: 7474
+        name: http
+      https:
+        enabled: false  # Disable HTTPS as Istio will handle TLS termination
+      bolt:
+        enabled: true
+        port: 7687
+        targetPort: 7687
+        name: tcp-bolt
+      backup:
+        enabled: false
+    selector:
+      "helm.neo4j.com/neo4j.loadbalancer": "include"
+    multiCluster: false
+
+  # Admin service for internal operations
+  admin:
+    enabled: true
+    annotations: {}
+    spec:
+      type: ClusterIP
+
+  # Default service for internal communications
+  default:
+    annotations: {}
+
+# Neo4j Configuration
+config:
+  server.config.strict_validation.enabled: "false"
+  # Enable HTTP connector
+  server.http.enabled: "true"
+  server.http.listen_address: "0.0.0.0:7474"
+  # Disable HTTPS as Istio handles TLS
+  server.https.enabled: "false"
+  # Bolt configuration
+  server.bolt.enabled: "true"
+  server.bolt.listen_address: "0.0.0.0:7687"
+  # Memory settings optimized for GCP
+  server.memory.heap.initial_size: "1G"
+  server.memory.heap.max_size: "1G"
+  server.memory.pagecache.size: "512M"
+  # Security settings
+  dbms.security.auth_enabled: "true"
+  # Browser policy for reverse proxy setup
+  dbms.security.http_access_control_allow_origin: "*"
+  browser.remote_content_hostname_whitelist: "*"
+  browser.retain_connection_credentials: "true"
+  # Configure for sub-path deployment with HTTPS
+  browser.credential_timeout: "0"
+  # Force Neo4j to use secure connections when behind HTTPS proxy
+  dbms.connector.bolt.tls_level: "DISABLED"
+  server.bolt.tls_level: "DISABLED"
+  # Configure advertised addresses for HTTPS proxy
+  server.default_advertised_address: "gcp.psai.dev"
+  server.bolt.advertised_address: "gcp.psai.dev:443"
+  server.http.advertised_address: "gcp.psai.dev:443"
+
+# Security Context
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 7474
+  runAsGroup: 7474
+  fsGroup: 7474
+  fsGroupChangePolicy: "Always"
+
+containerSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 7474
+  runAsGroup: 7474
+  capabilities:
+    drop: ["ALL"]
+
+# Pod specifications
+podSpec:
+  annotations:
+    # Istio sidecar injection
+    sidecar.istio.io/inject: "true"
+    # Istio traffic policy for Neo4j Browser
+    traffic.sidecar.istio.io/includeInboundPorts: "7474,7687"
+  
+  loadbalancer: "include"
+  terminationGracePeriodSeconds: 300  # Reduced for faster restarts
+  
+  # Anti-affinity for better distribution
+  podAntiAffinity: true
+  
+  # Node affinity and tolerations can be added here if needed
+  nodeAffinity: {}
+  tolerations: []
+  
+  # Priority class for important workloads
+  priorityClassName: ""
+
+# Image configuration
+image:
+  imagePullPolicy: IfNotPresent
+  # Use default Neo4j community image
+  customImage: ""
+
+# Probes configuration
+readinessProbe:
+  tcpSocket:
+    port: 7474  # Check HTTP port for browser access
+  failureThreshold: 20
+  timeoutSeconds: 10
+  periodSeconds: 5
+  initialDelaySeconds: 30
+
+livenessProbe:
+  tcpSocket:
+    port: 7687  # Check Bolt port for database connectivity
+  failureThreshold: 40
+  timeoutSeconds: 10
+  periodSeconds: 5
+  initialDelaySeconds: 60
+
+startupProbe:
+  tcpSocket:
+    port: 7474
+  failureThreshold: 60  # Allow more time for startup
+  periodSeconds: 10
+  initialDelaySeconds: 30
+
+# JVM Configuration
+jvm:
+  useNeo4jDefaultJvmArguments: true
+  additionalJvmArguments:
+    - "-XX:+UseG1GC"
+    - "-XX:+UnlockExperimentalVMOptions"
+    - "-XX:+TrustFinalNonStaticFields"
+    - "-XX:+DisableExplicitGC"
+
+# Environment variables
+env:
+  NEO4J_PLUGINS: '["apoc"]'  # Enable APOC plugin
+
+# Disable password logging for security
+logInitialPassword: false
+
+# Cluster domain
+clusterDomain: "cluster.local"
+
+# Additional configurations
+statefulset:
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "1"
+
+# SSL/TLS - Disabled as Istio handles this
+ssl:
+  bolt:
+    privateKey:
+      secretName: ""
+    publicCertificate:
+      secretName: ""
+  https:
+    privateKey:
+      secretName: ""
+    publicCertificate:
+      secretName: ""

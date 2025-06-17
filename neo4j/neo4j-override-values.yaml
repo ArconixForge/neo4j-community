@@ -111,19 +111,13 @@ config:
   server.memory.pagecache.size: "512M"
   # Security settings
   dbms.security.auth_enabled: "true"
-  # Browser policy for reverse proxy setup
+  # Browser policy for reverse proxy setup - FIXED SETTINGS
   dbms.security.http_access_control_allow_origin: "*"
-  browser.remote_content_hostname_whitelist: "*"
-  browser.retain_connection_credentials: "true"
-  # Configure for sub-path deployment with HTTPS
-  browser.credential_timeout: "0"
-  # Force Neo4j to use secure connections when behind HTTPS proxy
+  dbms.connector.http.advertised_address: "gcp.psai.dev:443"
+  dbms.connector.bolt.advertised_address: "gcp.psai.dev:443"
+  # Disable Bolt TLS since we're using HTTP with WSS upgrade
   dbms.connector.bolt.tls_level: "DISABLED"
   server.bolt.tls_level: "DISABLED"
-  # Configure advertised addresses for HTTPS proxy
-  server.default_advertised_address: "gcp.psai.dev"
-  server.bolt.advertised_address: "gcp.psai.dev:443"
-  server.http.advertised_address: "gcp.psai.dev:443"
 
 # Security Context
 securityContext:
@@ -203,6 +197,16 @@ jvm:
 # Environment variables
 env:
   NEO4J_PLUGINS: '["apoc"]'  # Enable APOC plugin
+  # Set the correct advertised addresses using environment variables
+  NEO4J_dbms_connector_http_advertised__address: "gcp.psai.dev:443"
+  NEO4J_dbms_connector_bolt_advertised__address: "gcp.psai.dev:443"
+  # Force secure connections
+  NEO4J_dbms_connector_bolt_tls__level: "DISABLED"
+  # Force HTTPS mode for Neo4j Browser
+  NEO4J_browser_force__https: "true"
+  # Set advertised addresses to use HTTPS
+  NEO4J_server_http_advertised__address: ":443"
+  NEO4J_server_bolt_advertised__address: ":443"
 
 # Disable password logging for security
 logInitialPassword: false

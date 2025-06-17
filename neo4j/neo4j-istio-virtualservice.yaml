@@ -9,6 +9,22 @@ spec:
   gateways:
     - "istio-system/ps-lbg-gateway"
   http:
+    # Handle WebSocket upgrades at root level (this is what Neo4j Browser is trying to do)
+    - match:
+        - headers:
+            upgrade:
+              exact: "websocket"
+      route:
+        - destination:
+            host: neo4j-community
+            port:
+              number: 7474
+      headers:
+        request:
+          set:
+            X-Forwarded-Proto: "https"
+            X-Forwarded-Host: "gcp.psai.dev"
+    
     # Handle direct /browser/ requests and redirect to our path
     - match:
         - uri:
@@ -52,7 +68,6 @@ spec:
             X-Forwarded-Proto: "https"
             X-Forwarded-Host: "gcp.psai.dev"
             X-Forwarded-For: "%DOWNSTREAM_REMOTE_ADDRESS%"
-            Host: "neo4j-community"
         response:
           set:
             X-Frame-Options: "SAMEORIGIN"
